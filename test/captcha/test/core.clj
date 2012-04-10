@@ -14,5 +14,5 @@
 
 (fact
   (let
-    [c (:ming (add-captcha "ming"))]
+    [c (:text (:ming (add-captcha "ming")))]
     (check? "ming" c) => true))

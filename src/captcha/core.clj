@@ -4,17 +4,29 @@
            [java.util Random]
            [javax.imageio ImageIO]))
 
+;use to hold captchas.
 (def captchas (ref {}))
+
+(defstruct captcha :text :create-time)
 
 (def r (Random.))
 
-(defn- random-captcha
+;captchas will timeout after 10 mins
+(def timeout 600000)
+
+(defn- random-captcha-text
   []
   (last
     (let [captcha (atom "")
           indexs (range 4)]
       (for [i indexs]
         (reset! captcha (str (. r nextInt 10) @captcha))))))
+
+(defn- random-captcha
+  []
+  (let [text (random-captcha-text)
+        create-time (System/currentTimeMillis)]
+    (struct captcha text create-time)))
 
 (defn add-captcha
   "add a captcha for id, if id is reduplicate, will throw a RuntimeException."
@@ -31,7 +43,7 @@
 (defn check?
   "check captcha"
   [id captcha]
-  (= captcha (get-captcha (keyword id))))
+  (= captcha (:text (get-captcha (keyword id)))))
 
 (defn refresh-captcha
   "refresh captcha. the ramdom captchas string will change."
@@ -55,7 +67,7 @@
      g (. img getGraphics)
      c (Color. 200 150 255)
      index (atom 0)
-     captcha (get-captcha id)]
+     captcha (:text (get-captcha id))]
     (. g setColor c)
     (. g fillRect 0 0 68 22)
     (for [char captcha]

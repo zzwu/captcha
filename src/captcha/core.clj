@@ -12,7 +12,7 @@
 (def r (Random.))
 
 ;captchas will timeout after 10 mins
-(def timeout 600000)
+(def max-hold-time 600000)
 
 (defn- random-captcha-text
   []
@@ -82,3 +82,32 @@
         (. g drawString (str char) (+ 3 (* 15 @index)) 18)
         (reset! index (inc @index))
         img))))
+
+(defn timeout?
+  [captcha max-time]
+  (>= (- (System/currentTimeMillis) (captcha :create-time)) max-time))
+
+(defn timeout-captcha-keys
+           [captchas max-time]
+           (let [ids (keys captchas)
+                 timeout-item-fn? (fn [id] (timeout? (id captchas) max-time))]
+             (filter timeout-item-fn? ids)))
+
+(defn dissoc-all
+  [captchas keys]
+  (reduce dissoc captchas keys))
+
+;remove timeout captchas
+(defn remove-timeout-itmes
+  [max-time]
+  (dosync
+    (alter captchas dissoc-all (timeout-captcha-keys @captchas max-time))))
+
+(defn- loop-check-timeout
+  []
+  (while true
+    (remove-timeout-itmes max-hold-time)
+    (Thread/sleep 1000)))
+
+;start a thread to check timeout items
+(.start (Thread. (fn [] (loop-check-timeout))))

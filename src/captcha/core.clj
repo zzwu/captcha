@@ -74,9 +74,9 @@
         (try ~@body
              (catch Exception ex#)))))
 
-(defn- start-clean-up [captchas expires-in timeout]
-  (when expires-in
-    (do-every expires-in
+(defn- start-clean-up [captchas timeout]
+  (when timeout
+    (do-every 10000
               (remove-timeout-captchas! captchas timeout))))
 
 (defrecord CaptchaManager [captchas dictionary length timeout]

@@ -49,28 +49,63 @@
   (get-img [this id] "gen a image, and return byte arrat of it.")
   (check [this id code] "check code."))
 
-(defrecord CaptchaManager [captchas dictionary length]
+(defn in-time-captchas
+  [captchas now timeout]
+  (reduce (fn [remains [id [code time]]]
+            (if (> timeout (- now time))
+              (assoc remains id [code time])
+              remains))
+          {} captchas))
+
+(defn remove-timeout-captchas!
+  [captchas timeout]
+  (swap! captchas in-time-captchas (System/currentTimeMillis) timeout))
+
+
+(defn- background-thread [^Runnable f]
+  (doto (Thread. f)
+    (.setDaemon true)
+    (.start)))
+
+(defmacro ^{:private true} do-every [delay & body]
+  `(background-thread
+     #(while true
+        (Thread/sleep ~delay)
+        (try ~@body
+             (catch Exception ex#)))))
+
+(defn- start-clean-up [captchas expires-in timeout]
+  (when expires-in
+    (do-every expires-in
+              (remove-timeout-captchas! captchas timeout))))
+
+(defrecord CaptchaManager [captchas dictionary length timeout]
   captcha-checker
   (get-img [this id]
-    (let [code (gen-random-code dictionary length)]
+    (let [code (gen-random-code dictionary length)
+          clean-up (delay (start-clean-up captchas 5000 timeout))]
       (do
-        (swap! captchas assoc id code)
+        (force clean-up)
+        (swap! captchas assoc id [code (System/currentTimeMillis)])
         (image->byte-array (gen-buffered-image code)))))
   (check [this id code]
-    (= (get id @captchas)
-       code)))
+    (if (= (first (get @captchas id))
+           code)
+      (do (swap! captchas dissoc id)
+          true)
+      false)))
 
-;;TODO Add timeout function
 (defn make-captcha-manager
   "reuturn a captcha magager.
    valid options are:
    :dictionary
    :length
-   :timeout"
+   :expires-in"
   [& options]
   (let [captchas (atom {})
-        {:keys [dictionary length]
+        {:keys [dictionary length expires-in]
          :or {dictionary (mapv str (range 10))
-              length 4}} options
-        manager (CaptchaManager. captchas dictionary length)]
+              length 4
+              expires-in (* 10 60 1000)}} options
+        manager (CaptchaManager. captchas dictionary length expires-in)]
     manager))

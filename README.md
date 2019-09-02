@@ -14,4 +14,4 @@ https://www.codeship.io/projects/cb6e3b70-2a61-0131-a8b0-1280352b15c4/status
 ## License
 Distributed under the Eclipse Public License, the same as Clojure.
 
-ORZ
+ORZ :)
